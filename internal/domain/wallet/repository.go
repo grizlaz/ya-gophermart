@@ -10,5 +10,6 @@ type repository interface {
 	GetUserBalance(context.Context, int64) (*Wallet, error)
 	GetUserWithdrawals(context.Context, int64) (*[]WalletHistory, error)
 	GetUserOrder(ctx context.Context, userID int64, number string) (*order.Order, error)
+	GetUserIDFromOrder(ctx context.Context, number string) (int64, error)
 	BalanceWithdrawal(ctx context.Context, userID int64, number string, operation WalletOperation, amount int) error
 }

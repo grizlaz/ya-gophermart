@@ -22,6 +22,7 @@ var (
 	ErrNotEnoughBalance = errors.New("not enough balance")
 	ErrWrongNumber      = errors.New("wrong number")
 	ErrGetWallet        = errors.New("err get user wallet")
+	ErrGetUserID        = errors.New("err get userID from number")
 )
 
 type WalletHistory struct {

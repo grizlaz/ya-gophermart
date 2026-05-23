@@ -17,12 +17,12 @@ import (
 	"go.uber.org/zap"
 )
 
-type postgres struct {
+type Postgres struct {
 	db *sql.DB
 }
 
-func NewPostgresDB(db *sql.DB) (*postgres, error) {
-	pg := &postgres{db}
+func NewPostgresDB(db *sql.DB) (*Postgres, error) {
+	pg := &Postgres{db}
 	migrationsDir := "migrations"
 	if err := goose.Up(db, migrationsDir); err != nil {
 		return nil, err
@@ -30,7 +30,7 @@ func NewPostgresDB(db *sql.DB) (*postgres, error) {
 	return pg, nil
 }
 
-func (p *postgres) GetUserByLogin(ctx context.Context, login string) (*user.User, error) {
+func (p *Postgres) GetUserByLogin(ctx context.Context, login string) (*user.User, error) {
 	query := `SELECT u."id", u."login", u."password" FROM public.user u WHERE u."login" = $1`
 	var user user.User
 	row := p.db.QueryRowContext(ctx, query, login)
@@ -44,7 +44,7 @@ func (p *postgres) GetUserByLogin(ctx context.Context, login string) (*user.User
 	return &user, nil
 }
 
-func (p *postgres) AddUser(ctx context.Context, user user.User) (int64, error) {
+func (p *Postgres) AddUser(ctx context.Context, login string, password [32]byte) (int64, error) {
 	userQuery := `INSERT INTO public.user (login, password) VALUES ($1, $2) RETURNING id`
 	walletQuery := `INSERT INTO public.wallet (user_id, balance, withdrawn) VALUES ($1, $2, $3)`
 	startWalletBalance := 0
@@ -55,7 +55,7 @@ func (p *postgres) AddUser(ctx context.Context, user user.User) (int64, error) {
 	defer tx.Rollback()
 
 	var id int64
-	row := tx.QueryRowContext(ctx, userQuery, user.Login, user.Password)
+	row := tx.QueryRowContext(ctx, userQuery, login, password[:])
 	err = row.Scan(&id)
 	if err != nil {
 		logger.Log.Error("error add user", zap.Error(err))
@@ -74,7 +74,7 @@ func (p *postgres) AddUser(ctx context.Context, user user.User) (int64, error) {
 	return id, nil
 }
 
-func (p *postgres) CreateOrder(ctx context.Context, orderToCreate order.Order) error {
+func (p *Postgres) CreateOrder(ctx context.Context, orderToCreate order.Order) error {
 	query := `INSERT INTO "order" ("number", user_id, status, accrual) VALUES ($1, $2, $3, $4)`
 	_, err := p.db.ExecContext(ctx, query, orderToCreate.Number, orderToCreate.UserID, orderToCreate.Status, orderToCreate.Accrual)
 	if err != nil {
@@ -89,7 +89,7 @@ func (p *postgres) CreateOrder(ctx context.Context, orderToCreate order.Order) e
 	return nil
 }
 
-func (p *postgres) SetOrdersStatus(ctx context.Context, newStatus order.Status, numbers ...string) error {
+func (p *Postgres) SetOrdersStatus(ctx context.Context, newStatus order.Status, numbers ...string) error {
 	argNumberDiff := 2
 	var values []string
 	args := make([]any, 0, len(numbers)+1)
@@ -105,7 +105,7 @@ func (p *postgres) SetOrdersStatus(ctx context.Context, newStatus order.Status, 
 	return err
 }
 
-func (p *postgres) GetUserOrders(ctx context.Context, userID int64) (*[]order.Order, error) {
+func (p *Postgres) GetUserOrders(ctx context.Context, userID int64) (*[]order.Order, error) {
 	query := `SELECT o."number", o.user_id, o.status, o.accrual, o.created_at, o.updated_at
 			  FROM "order" o
 			  WHERE o.user_id = $1
@@ -134,7 +134,7 @@ func (p *postgres) GetUserOrders(ctx context.Context, userID int64) (*[]order.Or
 	return &orders, nil
 }
 
-func (p *postgres) GetUserOrder(ctx context.Context, userID int64, number string) (*order.Order, error) {
+func (p *Postgres) GetUserOrder(ctx context.Context, userID int64, number string) (*order.Order, error) {
 	query := `SELECT o."number", o.user_id, o.status, o.accrual, o.created_at, o.updated_at
 			  FROM "order" o
 			  WHERE o.user_id = $1 and o."number" = $2`
@@ -151,7 +151,7 @@ func (p *postgres) GetUserOrder(ctx context.Context, userID int64, number string
 	return &order, nil
 }
 
-func (p *postgres) GetUserIDFromOrder(ctx context.Context, number string) (int64, error) {
+func (p *Postgres) GetUserIDFromOrder(ctx context.Context, number string) (int64, error) {
 	query := `SELECT o.user_id
 			  FROM "order" o
 			  WHERE o."number" = $1`
@@ -165,7 +165,7 @@ func (p *postgres) GetUserIDFromOrder(ctx context.Context, number string) (int64
 	return userID, nil
 }
 
-func (p *postgres) GetUserBalance(ctx context.Context, userID int64) (*wallet.Wallet, error) {
+func (p *Postgres) GetUserBalance(ctx context.Context, userID int64) (*wallet.Wallet, error) {
 	query := `SELECT w.user_id, w.balance, w.withdrawn 
 			  FROM "wallet" w 
 			  WHERE w.user_id = $1`
@@ -178,7 +178,7 @@ func (p *postgres) GetUserBalance(ctx context.Context, userID int64) (*wallet.Wa
 	return &wallet, nil
 }
 
-func (p *postgres) GetUserWithdrawals(ctx context.Context, userID int64) (*[]wallet.WalletHistory, error) {
+func (p *Postgres) GetUserWithdrawals(ctx context.Context, userID int64) (*[]wallet.WalletHistory, error) {
 	query := `SELECT h.user_id, h."number", h.operation, h.amount, h.date
 			  FROM "wallet_history" h
 			  WHERE h.user_id = $1 and h.operation = $2`
@@ -205,7 +205,7 @@ func (p *postgres) GetUserWithdrawals(ctx context.Context, userID int64) (*[]wal
 	return &histories, nil
 }
 
-func (p *postgres) BalanceWithdrawal(ctx context.Context, userID int64, number string, operation wallet.WalletOperation, amount int) error {
+func (p *Postgres) BalanceWithdrawal(ctx context.Context, userID int64, number string, operation wallet.WalletOperation, amount int) error {
 	changeBalanceQuery := `UPDATE "wallet"
 						   SET balance = balance - $2, 
 						   	   withdrawn = withdrawn + $2

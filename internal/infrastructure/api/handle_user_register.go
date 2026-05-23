@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"io"
@@ -12,13 +13,8 @@ import (
 )
 
 type userRegisterService interface {
-	Register(ctx context.Context, newUser user.User) (int64, error)
+	Register(ctx context.Context, login string, password [32]byte) (int64, error)
 }
-
-// type userRegisterRequest struct {
-// 	Login    string `json:"login"`
-// 	Password string `json:"password"`
-// }
 
 func HandleUserRegister(userService userRegisterService) echo.HandlerFunc {
 	return func(c echo.Context) error {
@@ -33,8 +29,8 @@ func HandleUserRegister(userService userRegisterService) echo.HandlerFunc {
 		if err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, err)
 		}
-
-		userID, err := userService.Register(c.Request().Context(), request)
+		shaPassword := sha256.Sum256([]byte(request.Password))
+		userID, err := userService.Register(c.Request().Context(), request.Login, shaPassword)
 		if err != nil {
 			if errors.Is(err, user.ErrLoginAlreadyExists) {
 				return echo.NewHTTPError(http.StatusConflict, user.ErrLoginAlreadyExists)

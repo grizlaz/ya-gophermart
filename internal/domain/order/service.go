@@ -2,6 +2,9 @@ package order
 
 import (
 	"context"
+
+	"github.com/grizlaz/ya-gophermart/internal/infrastructure/logger"
+	"go.uber.org/zap"
 )
 
 type loyaltyService interface {
@@ -48,11 +51,20 @@ func (s *Service) CreateOrder(ctx context.Context, userID int64, number string) 
 		return err
 	}
 	s.loyalty.AddOrderToQueue(number)
+	err = s.db.SetOrdersStatus(ctx, PROCESSING, number)
+	if err != nil {
+		logger.Log.Debug("err update order status", zap.Error(err))
+		return err
+	}
 	return nil
 }
 
 func (s *Service) GetUserOrders(ctx context.Context, userID int64) (*[]Order, error) {
 	return s.db.GetUserOrders(ctx, userID)
+}
+
+func (s *Service) SetOrdersStatus(ctx context.Context, newStatus Status, numbers ...string) error {
+	return s.db.SetOrdersStatus(ctx, newStatus, numbers...)
 }
 
 func CheckLuhn(number string) bool {

@@ -2,7 +2,7 @@
 create table if not exists "user" (
 	id serial primary key,
 	login text not null,
-	password text not null 
+	password bytea not null 
 );
 
 create index if not exists idx_user_login on "user"(login);

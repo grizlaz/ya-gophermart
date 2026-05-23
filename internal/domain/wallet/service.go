@@ -49,3 +49,11 @@ func (w *Service) BalanceWithdrawal(ctx context.Context, userID int64, number st
 
 	return w.db.BalanceWithdrawal(ctx, userID, number, SUB, amount)
 }
+
+func (w *Service) AddBalanceFromNumber(ctx context.Context, number string, amount int) error {
+	userID, err := w.db.GetUserIDFromOrder(ctx, number)
+	if err != nil {
+		return ErrGetUserID
+	}
+	return w.db.BalanceWithdrawal(ctx, userID, number, ADD, amount)
+}

@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -11,7 +12,7 @@ import (
 )
 
 type userAuthService interface {
-	Auth(ctx context.Context, login, password string) (int64, error)
+	Auth(ctx context.Context, login string, password [32]byte) (int64, error)
 }
 
 func HandleUserLogin(userService userAuthService) echo.HandlerFunc {
@@ -27,8 +28,8 @@ func HandleUserLogin(userService userAuthService) echo.HandlerFunc {
 		if err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, err)
 		}
-
-		userID, err := userService.Auth(c.Request().Context(), request.Login, request.Password)
+		shaPassword := sha256.Sum256([]byte(request.Password))
+		userID, err := userService.Auth(c.Request().Context(), request.Login, shaPassword)
 		if err != nil {
 			return echo.NewHTTPError(http.StatusUnauthorized, err)
 		}

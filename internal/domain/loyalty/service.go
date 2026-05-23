@@ -10,8 +10,6 @@ import (
 	"slices"
 	"time"
 
-	"github.com/grizlaz/ya-gophermart/internal/domain/order"
-	"github.com/grizlaz/ya-gophermart/internal/domain/wallet"
 	"github.com/grizlaz/ya-gophermart/internal/infrastructure/config"
 	"github.com/grizlaz/ya-gophermart/internal/infrastructure/logger"
 	"go.uber.org/zap"
@@ -19,22 +17,23 @@ import (
 )
 
 type Service struct {
-	db        repository
-	client    http.Client
-	address   string
-	ratelimit int
-	orders    chan string
+	db             repository
+	client         http.Client
+	address        string
+	ratelimit      int
+	orders         chan string
+	OrderProcessed chan AccrualResponse
 }
 
-// не нравится что тут идет управление статусом заказа и кошельком пользователя, но пока не придумал как сделать красивее ы
 func NewService(ctx context.Context, db repository) (*Service, error) {
 	cfg := config.Get()
 	service := &Service{
-		db:        db,
-		client:    http.Client{},
-		address:   cfg.AccrualAddress,
-		ratelimit: cfg.RateLimit,
-		orders:    make(chan string, 100),
+		db:             db,
+		client:         http.Client{},
+		address:        cfg.AccrualAddress,
+		ratelimit:      cfg.RateLimit,
+		orders:         make(chan string, cfg.BufferSize),
+		OrderProcessed: make(chan AccrualResponse, cfg.BufferSize),
 	}
 	go service.checkOrders(ctx)
 	return service, nil
@@ -54,11 +53,12 @@ func (l *Service) checkOrders(ctx context.Context) {
 			if len(queue) == 0 {
 				continue
 			}
-			err := l.db.SetOrdersStatus(ctx, order.PROCESSING, queue...)
-			if err != nil {
-				logger.Log.Error("cannot update status for new orders", zap.Error(err))
-				continue
-			}
+			//вынес в сервис orders
+			// err := l.db.SetOrdersStatus(ctx, order.PROCESSING, queue...)
+			// if err != nil {
+			// 	logger.Log.Error("cannot update status for new orders", zap.Error(err))
+			// 	continue
+			// }
 			g, ctx := errgroup.WithContext(ctx)
 			g.SetLimit(l.ratelimit)
 			for _, number := range queue {
@@ -68,7 +68,7 @@ func (l *Service) checkOrders(ctx context.Context) {
 				})
 			}
 			queue = nil
-			if err = g.Wait(); err != nil {
+			if err := g.Wait(); err != nil {
 				logger.Log.Error("error while check order result", zap.Error(err))
 			}
 		case <-ctx.Done():
@@ -87,21 +87,23 @@ func (l *Service) validateResponse(ctx context.Context, number string) error {
 		l.AddOrderToQueue(number)
 		return nil
 	}
-	userID, err := l.db.GetUserIDFromOrder(ctx, number)
-	if err != nil {
-		return err
-	}
-	err = l.db.SetOrdersStatus(ctx, order.Status(result.Status), number)
-	if err != nil {
-		return err
-	}
-	if result.Status == INVALID || result.Accrual == 0 {
-		return nil
-	}
-	err = l.db.BalanceWithdrawal(ctx, userID, number, wallet.ADD, result.Accrual)
-	if err != nil {
-		return err
-	}
+	l.OrderProcessed <- *result
+	//вынес в отдельный воркер
+	// userID, err := l.db.GetUserIDFromOrder(ctx, number)
+	// if err != nil {
+	// 	return err
+	// }
+	// err = l.db.SetOrdersStatus(ctx, order.Status(result.Status), number)
+	// if err != nil {
+	// 	return err
+	// }
+	// if result.Status == INVALID || result.Accrual == 0 {
+	// 	return nil
+	// }
+	// err = l.db.BalanceWithdrawal(ctx, userID, number, wallet.ADD, result.Accrual)
+	// if err != nil {
+	// 	return err
+	// }
 	return nil
 }
 
@@ -147,18 +149,16 @@ func (l *Service) GetOrderStatus(ctx context.Context, number string) (*AccrualRe
 func (l *Service) fakeRequest(number string) (*AccrualResponse, error) {
 	max := 1000
 	sec1 := rand.New(rand.NewSource(time.Now().UnixNano()))
-	sec2 := rand.New(rand.NewSource(time.Now().UnixNano()))
-	sec3 := rand.New(rand.NewSource(time.Now().UnixNano()))
 	//эмуляция недоступности сервиса
 	if sec1.Int()%10 == 0 {
 		return nil, ErrUnavailable
 	}
 	response := AccrualResponse{
 		Order:   number,
-		Accrual: sec3.Intn(max),
+		Accrual: sec1.Intn(max),
 	}
 	//эмуляция разной обработки заказов
-	switch sec2.Int() % 4 {
+	switch sec1.Int() % 4 {
 	case 0:
 		response.Status = REGISTERED
 	case 1:
