@@ -25,30 +25,26 @@ import (
 )
 
 func main() {
-	config := config.Get()
+	cfg := config.Get()
 	if err := logger.Initialize("debug"); err != nil {
 		panic(err)
 	}
 
-	db, err := sql.Open("pgx", config.DatabaseURI)
+	db, err := sql.Open("pgx", cfg.DatabaseURI)
 	if err != nil {
 		logger.Log.Fatal("error init db", zap.Error(err))
 	}
 	defer db.Close()
 	ctx := context.Background()
-	storage, err := repository.NewPostgresDB(db)
-	if err != nil {
-		logger.Log.Fatal("error init pg repository", zap.Error(err))
-	}
 
-	userService, loyaltyService, orderService, walletService := initServices(ctx, storage)
+	userService, loyaltyService, orderService, walletService := initServices(ctx, db)
 	srv := app.NewServer(userService, orderService, walletService, loyaltyService)
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 
 	go func() {
-		if err := http.ListenAndServe(config.ServerAddress, srv); !errors.Is(err, http.ErrServerClosed) {
+		if err := http.ListenAndServe(cfg.ServerAddress, srv); !errors.Is(err, http.ErrServerClosed) {
 			logger.Log.Fatal("error running server", zap.Error(err))
 		}
 	}()
@@ -66,20 +62,21 @@ func main() {
 	logger.Log.Info("server stopped")
 }
 
-func initServices(ctx context.Context, storage *repository.Postgres) (*user.Service, *loyalty.Service, *order.Service, *wallet.Service) {
-	userService, err := user.NewService(storage)
+func initServices(ctx context.Context, db *sql.DB) (*user.Service, *loyalty.Service, *order.Service, *wallet.Service) {
+	userStorage, orderStorage, walletStorage := initStorages(db)
+	userService, err := user.NewService(userStorage)
 	if err != nil {
 		logger.Log.Fatal("error init user service", zap.Error(err))
 	}
-	loyaltyService, err := loyalty.NewService(ctx, storage)
+	loyaltyService, err := loyalty.NewService(ctx, orderStorage)
 	if err != nil {
 		logger.Log.Fatal("error init loyalty service", zap.Error(err))
 	}
-	orderService, err := order.NewService(ctx, storage, loyaltyService)
+	orderService, err := order.NewService(orderStorage, loyaltyService)
 	if err != nil {
 		logger.Log.Fatal("error init order service", zap.Error(err))
 	}
-	walletService, err := wallet.NewService(storage)
+	walletService, err := wallet.NewService(walletStorage)
 	if err != nil {
 		logger.Log.Fatal("error init wallet service", zap.Error(err))
 	}
@@ -88,4 +85,20 @@ func initServices(ctx context.Context, storage *repository.Postgres) (*user.Serv
 		logger.Log.Fatal("error init worker service", zap.Error(err))
 	}
 	return userService, loyaltyService, orderService, walletService
+}
+
+func initStorages(db *sql.DB) (*repository.UserPostgres, *repository.OrderPostgres, *repository.WalletPostgres) {
+	userStorage, err := repository.NewUserPostgresDB(db)
+	if err != nil {
+		logger.Log.Fatal("error init user storage", zap.Error(err))
+	}
+	orderStorage, err := repository.NewOrderPostgresDB(db)
+	if err != nil {
+		logger.Log.Fatal("error init order storage", zap.Error(err))
+	}
+	walletStorage, err := repository.NewWalletPostgresDB(db)
+	if err != nil {
+		logger.Log.Fatal("error init wallet storage", zap.Error(err))
+	}
+	return userStorage, orderStorage, walletStorage
 }

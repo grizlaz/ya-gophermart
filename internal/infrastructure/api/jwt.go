@@ -1,19 +1,18 @@
 package api
 
 import (
-	"fmt"
+	"errors"
 	"net/http"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/grizlaz/ya-gophermart/internal/domain/user"
 	"github.com/grizlaz/ya-gophermart/internal/infrastructure/config"
-	"github.com/grizlaz/ya-gophermart/internal/infrastructure/logger"
 	echojwt "github.com/labstack/echo-jwt/v4"
 	"github.com/labstack/echo/v4"
 )
 
-func makeJWT(ID int64) (string, error) {
+func MakeJWT(ID int64) (string, error) {
 	cfg := config.Get()
 	claims := user.UserClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -26,33 +25,14 @@ func makeJWT(ID int64) (string, error) {
 }
 
 func getUserID(c echo.Context) (int64, error) {
-	tokenString := c.Request().Header.Get(user.AuthHeaderName)
-	if len(tokenString) == 0 {
-		return 0, user.ErrUnauthorized
-	}
-	cfg := config.Get()
-
-	claims := &user.UserClaims{}
-	token, err := jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (any, error) {
-		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
-		}
-		return cfg.SecretKey, nil
-	})
-
+	token, err := echo.ContextGet[*jwt.Token](c, "user")
 	if err != nil {
-		return 0, err
+		return 0, echo.ErrUnauthorized
 	}
-
-	if claims.UserID == 0 {
-		return 0, user.ErrUnauthorized
+	claims, ok := token.Claims.(*user.UserClaims)
+	if !ok {
+		return 0, errors.New("failed to cast claims as UserClaims")
 	}
-
-	if !token.Valid {
-		logger.Log.Info("invalid token")
-		return 0, err
-	}
-
 	return claims.UserID, nil
 }
 

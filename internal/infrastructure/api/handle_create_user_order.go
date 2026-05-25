@@ -48,7 +48,6 @@ func HandleCreateUserOrder(service orderService) echo.HandlerFunc {
 			if errors.Is(err, order.ErrWrongNumber) {
 				return echo.NewHTTPError(http.StatusUnprocessableEntity, err)
 			}
-			//TODO сделать обработку разных ошибок
 			return echo.NewHTTPError(http.StatusBadRequest, err)
 		}
 

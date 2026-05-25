@@ -10,7 +10,7 @@ import (
 )
 
 type orderGetService interface {
-	GetUserOrders(ctx context.Context, userID int64) (*[]order.Order, error)
+	GetUserOrders(ctx context.Context, userID int64) ([]order.Order, error)
 }
 
 type userOrder struct {
@@ -31,12 +31,12 @@ func HandleGetUserOrders(orderService orderGetService) echo.HandlerFunc {
 		if err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, err)
 		}
-		if len(*orders) == 0 {
+		if len(orders) == 0 {
 			return c.NoContent(http.StatusNoContent)
 		}
 
-		response := make([]userOrder, 0, len(*orders))
-		for _, v := range *orders {
+		response := make([]userOrder, 0, len(orders))
+		for _, v := range orders {
 			response = append(response, userOrder{
 				Number:    v.Number,
 				Status:    v.Status,

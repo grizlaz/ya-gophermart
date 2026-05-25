@@ -17,10 +17,10 @@ type Service struct {
 	loyalty loyaltyService
 }
 
-func NewService(ctx context.Context, db repository, loaloyaltyService loyaltyService) (*Service, error) {
+func NewService(db repository, loyaltyService loyaltyService) (*Service, error) {
 	service := &Service{
 		db:      db,
-		loyalty: loaloyaltyService,
+		loyalty: loyaltyService,
 	}
 	return service, nil
 }
@@ -59,7 +59,7 @@ func (s *Service) CreateOrder(ctx context.Context, userID int64, number string) 
 	return nil
 }
 
-func (s *Service) GetUserOrders(ctx context.Context, userID int64) (*[]Order, error) {
+func (s *Service) GetUserOrders(ctx context.Context, userID int64) ([]Order, error) {
 	return s.db.GetUserOrders(ctx, userID)
 }
 

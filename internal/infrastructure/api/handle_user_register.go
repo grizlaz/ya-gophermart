@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"io"
@@ -10,10 +9,11 @@ import (
 
 	"github.com/grizlaz/ya-gophermart/internal/domain/user"
 	"github.com/labstack/echo/v4"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type userRegisterService interface {
-	Register(ctx context.Context, login string, password [32]byte) (int64, error)
+	Register(ctx context.Context, login string, password string) (int64, error)
 }
 
 func HandleUserRegister(userService userRegisterService) echo.HandlerFunc {
@@ -29,16 +29,22 @@ func HandleUserRegister(userService userRegisterService) echo.HandlerFunc {
 		if err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, err)
 		}
-		shaPassword := sha256.Sum256([]byte(request.Password))
-		userID, err := userService.Register(c.Request().Context(), request.Login, shaPassword)
+
+		// shaPassword := sha256.Sum256([]byte(request.Password))
+		// userID, err := userService.Register(c.Request().Context(), request.Login, shaPassword)
+		hashPwd, err := hashPassword(request.Password)
+		userID, err := userService.Register(c.Request().Context(), request.Login, hashPwd)
 		if err != nil {
 			if errors.Is(err, user.ErrLoginAlreadyExists) {
 				return echo.NewHTTPError(http.StatusConflict, user.ErrLoginAlreadyExists)
 			}
+			if errors.Is(err, bcrypt.ErrPasswordTooLong) {
+				return echo.NewHTTPError(http.StatusBadRequest, bcrypt.ErrPasswordTooLong)
+			}
 			return echo.NewHTTPError(http.StatusInternalServerError, err)
 		}
 
-		token, err := makeJWT(userID)
+		token, err := MakeJWT(userID)
 		if err != nil {
 			return echo.NewHTTPError(http.StatusInternalServerError, err)
 		}
@@ -47,4 +53,9 @@ func HandleUserRegister(userService userRegisterService) echo.HandlerFunc {
 
 		return c.NoContent(http.StatusOK)
 	}
+}
+
+func hashPassword(password string) (string, error) {
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
+	return string(bytes), err
 }

@@ -15,6 +15,7 @@ type config struct {
 	SecretKey      []byte
 	RateLimit      int
 	BufferSize     int
+	MigrationsDir  string
 }
 
 var (
@@ -28,6 +29,7 @@ func Get() config {
 		cfg.TokenExp = time.Hour * 24
 		cfg.RateLimit = 100
 		cfg.BufferSize = 100
+		cfg.MigrationsDir = "migrations"
 		flag.StringVar(&cfg.ServerAddress, "a", ":8080", "address and port to run server")
 		flag.StringVar(&cfg.DatabaseURI, "d", "", "DSN for db")
 		flag.StringVar(&cfg.AccrualAddress, "r", "", "address for accrual system")
