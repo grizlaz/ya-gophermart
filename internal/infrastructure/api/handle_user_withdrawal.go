@@ -22,7 +22,6 @@ type withdrawalRequest struct {
 
 func HandleUserWithdrawal(service walletWithdrawalService) echo.HandlerFunc {
 	return func(c echo.Context) error {
-
 		userID, err := getUserID(c)
 		if err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, err)

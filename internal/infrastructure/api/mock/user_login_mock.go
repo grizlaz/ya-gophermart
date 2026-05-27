@@ -35,7 +35,7 @@ func (m *MockuserAuthService) EXPECT() *MockuserAuthServiceMockRecorder {
 }
 
 // Auth mocks base method.
-func (m *MockuserAuthService) Auth(ctx context.Context, login string, password [32]byte) (int64, error) {
+func (m *MockuserAuthService) Auth(ctx context.Context, login, password string) (int64, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Auth", ctx, login, password)
 	ret0, _ := ret[0].(int64)

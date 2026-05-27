@@ -2,8 +2,6 @@ package loyalty
 
 import "errors"
 
-var AccrualPath = "/api/orders/{number}"
-
 type Status string
 
 const (

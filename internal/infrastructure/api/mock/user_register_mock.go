@@ -35,7 +35,7 @@ func (m *MockuserRegisterService) EXPECT() *MockuserRegisterServiceMockRecorder 
 }
 
 // Register mocks base method.
-func (m *MockuserRegisterService) Register(ctx context.Context, login string, password [32]byte) (int64, error) {
+func (m *MockuserRegisterService) Register(ctx context.Context, login, password string) (int64, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Register", ctx, login, password)
 	ret0, _ := ret[0].(int64)
