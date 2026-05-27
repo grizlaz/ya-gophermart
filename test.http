@@ -1,0 +1,49 @@
+@token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3Nzk4MTM0NTMsInVzZXJfaWQiOjF9.A1TlV30n-FeQJSxFLvPX1p8krSYezqtd8G0CsOyH2W4
+
+###
+POST http://localhost:8080/api/user/login
+Content-Type: application/json
+Accept-Encoding: gzip
+{
+    "login":"admin",
+    "password":"admin"
+}
+
+
+POST http://localhost:8080/api/user/register
+Content-Type: application/json
+Accept-Encoding: gzip
+{
+    "login":"admin",
+    "password":"admin"
+}
+
+
+POST http://localhost:8080/api/user/orders
+Content-Type: text/plain
+Authorization: {{token}}
+12345678903
+
+POST http://localhost:8080/api/user/orders
+Content-Type: text/plain
+authorization: {{token}}
+109
+
+
+GET http://localhost:8080/api/user/orders
+authorization: {{token}}
+
+
+GET http://localhost:8080/api/user/balance
+authorization: {{token}}
+
+GET http://localhost:8080/api/user/withdrawals
+authorization: {{token}}
+
+POST http://localhost:8080/api/user/balance/withdraw
+authorization: {{token}}
+Content-Type: application/json
+{
+    "order": "109",
+    "sum": 100
+}
